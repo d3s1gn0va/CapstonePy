@@ -7,8 +7,9 @@ REMOTE_ROBOT_DIR="/home/hyunwoo/robot_demo"
 
 ssh -i "$SSH_KEY" "$PI_HOST" "bash -lc '
 set -euo pipefail
+
 echo \"== Robot process ==\"
-pgrep -af \"python.*robot_demo|python.*main.py\" || echo \"No matching robot Python process found.\"
+pgrep -af \"python.*robot_demo|python.*main.py|run_robot_demo\" || echo \"No matching robot process found.\"
 
 echo
 echo \"== Service status ==\"
@@ -16,7 +17,19 @@ systemctl --user --no-pager status robot-demo.service 2>/dev/null || systemctl -
 
 echo
 echo \"== Arduino USB Serial candidates ==\"
-ls -l /dev/serial/by-id/* /dev/ttyACM* /dev/ttyUSB* 2>/dev/null || echo \"No USB Serial candidates found.\"
+for pattern in \"/dev/serial/by-id/*\" \"/dev/ttyACM*\" \"/dev/ttyUSB*\"; do
+  for candidate in \$pattern; do
+    [ -e \"\$candidate\" ] && ls -l \"\$candidate\"
+  done
+done
+
+echo
+echo \"== Audio player ==\"
+if command -v pw-play >/dev/null 2>&1; then
+  echo \"pw-play: \$(command -v pw-play)\"
+else
+  echo \"pw-play not found\"
+fi
 
 echo
 echo \"== Recent logs ==\"

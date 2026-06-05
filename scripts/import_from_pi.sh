@@ -9,7 +9,10 @@ LOCAL_ROBOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/raspberry_pi/r
 mkdir -p "$LOCAL_ROBOT_DIR"
 
 rsync -av \
+  --exclude ".DS_Store" \
+  --exclude "._*" \
   --exclude ".env" \
+  --exclude ".env.*" \
   --exclude "*.log" \
   --exclude "__pycache__/" \
   --exclude "*.pyc" \

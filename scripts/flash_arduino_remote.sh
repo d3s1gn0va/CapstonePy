@@ -2,50 +2,111 @@
 set -euo pipefail
 
 # DANGER: This script uploads firmware to the Arduino Mega.
-# Run only when the user has explicitly said: Arduino 업로드 승인
-# Firmware upload can move servos unexpectedly after reset. Keep the mechanism clear.
+# Run only after the user explicitly says: Arduino 업로드 승인
+# Firmware upload resets the Arduino and may cause servo movement.
 
 PI_HOST="hyunwoo@192.168.0.39"
 SSH_KEY="$HOME/.ssh/robotpi_ed25519"
 REMOTE_ROBOT_DIR="/home/hyunwoo/robot_demo"
+REMOTE_BUILD_DIR="/home/hyunwoo/capstone-robot-build/servo_controller"
+ARDUINO_FQBN="arduino:avr:mega"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOCAL_ARDUINO_DIR="$PROJECT_ROOT/arduino/servo_controller"
-REMOTE_BUILD_DIR="/tmp/capstone_servo_controller"
 
-echo "DANGER: This uploads firmware to Arduino Mega and may cause servo movement."
-echo "Continue only after explicit user approval: Arduino 업로드 승인"
+cat <<'WARNING'
+DANGER: Arduino Mega firmware upload can reset the board and may move servos.
+Keep the robot mechanism clear and powered safely.
 
-ssh -i "$SSH_KEY" "$PI_HOST" "bash -lc '
-set -euo pipefail
-if systemctl --user list-unit-files robot-demo.service >/dev/null 2>&1; then
-  systemctl --user stop robot-demo.service
-elif systemctl list-unit-files robot-demo.service >/dev/null 2>&1; then
-  sudo systemctl stop robot-demo.service
-else
-  pkill -f \"python.*robot_demo|python.*main.py\" || true
-fi
-rm -rf \"$REMOTE_BUILD_DIR\"
-mkdir -p \"$REMOTE_BUILD_DIR\"
-'"
+This script must be run only after explicit user approval:
+Arduino 업로드 승인
+WARNING
 
-rsync -av -e "ssh -i $SSH_KEY" "$LOCAL_ARDUINO_DIR/" "$PI_HOST:$REMOTE_BUILD_DIR/"
-
-ssh -i "$SSH_KEY" "$PI_HOST" "bash -lc '
-set -euo pipefail
-PORT=\"\"
-for candidate in /dev/serial/by-id/* /dev/ttyACM* /dev/ttyUSB*; do
-  if [ -e \"$candidate\" ]; then
-    PORT=\"$candidate\"
-    break
-  fi
-done
-if [ -z \"$PORT\" ]; then
-  echo \"No Arduino USB Serial device found.\" >&2
+printf "Type the exact approval phrase to continue: "
+IFS= read -r APPROVAL
+if [ "$APPROVAL" != "Arduino 업로드 승인" ]; then
+  echo "Aborted: approval phrase did not match."
   exit 1
 fi
-arduino-cli compile --fqbn arduino:avr:mega \"$REMOTE_BUILD_DIR\"
-arduino-cli upload -p \"$PORT\" --fqbn arduino:avr:mega \"$REMOTE_BUILD_DIR\"
+
+test -f "$LOCAL_ARDUINO_DIR/servo_controller.ino"
+
+ssh -i "$SSH_KEY" "$PI_HOST" "mkdir -p '$REMOTE_BUILD_DIR'"
+rsync -av --delete \
+  --exclude ".DS_Store" \
+  --exclude "._*" \
+  -e "ssh -i $SSH_KEY" \
+  "$LOCAL_ARDUINO_DIR/" \
+  "$PI_HOST:$REMOTE_BUILD_DIR/"
+
+ssh -i "$SSH_KEY" "$PI_HOST" \
+  "REMOTE_ROBOT_DIR='$REMOTE_ROBOT_DIR' REMOTE_BUILD_DIR='$REMOTE_BUILD_DIR' ARDUINO_FQBN='$ARDUINO_FQBN' bash -s" <<'REMOTE_SCRIPT'
+set -euo pipefail
+
+find_arduino_port() {
+  local candidate
+  for candidate in /dev/serial/by-id/* /dev/ttyACM* /dev/ttyUSB*; do
+    if [ -e "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+echo "Stopping robot program before firmware upload..."
+if systemctl --user list-unit-files robot-demo.service >/dev/null 2>&1; then
+  systemctl --user stop robot-demo.service || true
+elif systemctl list-unit-files robot-demo.service >/dev/null 2>&1; then
+  sudo systemctl stop robot-demo.service || true
+else
+  pkill -f "python.*robot_demo|python.*main.py|run_robot_demo" || true
+fi
+
+PORT="$(find_arduino_port || true)"
+if [ -z "$PORT" ]; then
+  echo "No Arduino USB Serial device found." >&2
+  exit 1
+fi
+
+echo "Using Arduino port: $PORT"
+arduino-cli compile --fqbn "$ARDUINO_FQBN" "$REMOTE_BUILD_DIR"
+arduino-cli upload -p "$PORT" --fqbn "$ARDUINO_FQBN" "$REMOTE_BUILD_DIR"
+
+echo "Waiting for Arduino reset..."
 sleep 3
-echo \"Upload finished. Check serial response with an approved serial monitor command if needed.\"
-echo \"Restart robot program with: scripts/restart_robot.sh\"
-'"
+
+echo "Checking Arduino PING response..."
+python3 - "$PORT" <<'PY'
+import sys
+import time
+
+import serial
+
+port = sys.argv[1]
+with serial.Serial(port, 115200, timeout=1.5) as ser:
+    time.sleep(2.0)
+    ser.reset_input_buffer()
+    ser.write(b"PING\n")
+    ser.flush()
+    deadline = time.time() + 5.0
+    lines = []
+    while time.time() < deadline:
+        raw = ser.readline()
+        if not raw:
+            continue
+        text = raw.decode("utf-8", errors="replace").strip()
+        lines.append(text)
+        print(text)
+        if text == "ACK,PING":
+            sys.exit(0)
+
+print("Arduino did not return ACK,PING.", file=sys.stderr)
+if lines:
+    print("Received lines: " + " | ".join(lines), file=sys.stderr)
+sys.exit(1)
+PY
+
+echo "Upload and PING check finished."
+echo "Restart the robot program after a final safety check:"
+echo "  scripts/restart_robot.sh"
+REMOTE_SCRIPT

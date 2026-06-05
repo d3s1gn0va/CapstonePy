@@ -10,7 +10,10 @@ LOCAL_ROBOT_DIR="$PROJECT_ROOT/raspberry_pi/robot_demo"
 "$PROJECT_ROOT/scripts/check_python.sh"
 
 rsync -av \
+  --exclude ".DS_Store" \
+  --exclude "._*" \
   --exclude ".env" \
+  --exclude ".env.*" \
   --exclude "*.log" \
   --exclude "__pycache__/" \
   --exclude "*.pyc" \

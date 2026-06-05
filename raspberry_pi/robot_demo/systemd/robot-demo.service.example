@@ -1,0 +1,19 @@
+[Unit]
+Description=Robot Demo Control Sequence
+After=multi-user.target sound.target
+Wants=multi-user.target
+
+[Service]
+Type=simple
+
+# 아래 두 줄의 YOUR_USERNAME을 Raspberry Pi OS 사용자 이름으로 바꾸세요.
+User=YOUR_USERNAME
+WorkingDirectory=/home/YOUR_USERNAME/robot_demo
+
+ExecStart=/usr/bin/python3 /home/YOUR_USERNAME/robot_demo/main.py
+
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
