@@ -12,4 +12,4 @@ cd "$ROBOT_DIR" || exit 1
 echo "==================================================" >> "$LOG_FILE"
 echo "[Autostart] $(date '+%Y-%m-%d %H:%M:%S') robot demo start" >> "$LOG_FILE"
 
-/usr/bin/python3 "$ROBOT_DIR/main.py" >> "$LOG_FILE" 2>&1
+/usr/bin/python3 -u "$ROBOT_DIR/main.py" >> "$LOG_FILE" 2>&1

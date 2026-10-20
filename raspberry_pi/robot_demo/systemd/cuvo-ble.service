@@ -1,0 +1,20 @@
+[Unit]
+Description=CUVO offline Bluetooth controller
+After=dbus.socket pipewire.service wireplumber.service
+Wants=pipewire.service wireplumber.service
+StartLimitIntervalSec=120
+StartLimitBurst=12
+
+[Service]
+Type=simple
+WorkingDirectory=%h/capstone-robot-build/ble_control_20261006/robot_demo
+ExecStart=%h/cuvo_oled_test/.venv/bin/python -u %h/capstone-robot-build/ble_control_20261006/robot_demo/cuvo_ble.py --confirm-5v-and-clear --home-on-start-stop --pairing-seconds 900
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+TimeoutStopSec=45
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

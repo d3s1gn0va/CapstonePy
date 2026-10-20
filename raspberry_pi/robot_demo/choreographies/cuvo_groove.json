@@ -1,0 +1,27 @@
+{
+  "schema_version": 2,
+  "id": "cuvo_groove",
+  "title": "CUVO Groove",
+  "bpm": 100,
+  "passive_elbows": {"minimum": 120, "maximum": 180, "preset": 150, "mechanism": "manual_freestop"},
+  "steps": [
+    {"name": "groove_prepare", "label": "준비", "duration_ms": 1200, "relative": {"head": 0, "crown": 0, "right_shoulder_x": 0, "right_shoulder_y": 0, "left_shoulder_x": 0, "left_shoulder_y": 0}, "eye": {"openness": 1, "offset_x": 0, "offset_y": 0}},
+    {"name": "groove_01", "label": "교대 스윙", "beat": 1, "sound": "kick", "duration_ms": 600, "relative": {"head": 20, "crown": 0, "right_shoulder_x": 55, "right_shoulder_y": 25, "left_shoulder_x": 10, "left_shoulder_y": 25}, "eye": {"openness": 1, "offset_x": -12, "offset_y": 6}},
+    {"name": "groove_02", "label": "교대 스윙", "beat": 2, "sound": "snare", "duration_ms": 600, "relative": {"head": 12, "crown": 0, "right_shoulder_x": 40, "right_shoulder_y": 22, "left_shoulder_x": 20, "left_shoulder_y": 22}, "eye": {"openness": 1, "offset_x": -7, "offset_y": 3}},
+    {"name": "groove_03", "label": "교대 스윙", "beat": 3, "sound": "kick", "duration_ms": 600, "relative": {"head": -20, "crown": 0, "right_shoulder_x": 10, "right_shoulder_y": 25, "left_shoulder_x": 55, "left_shoulder_y": 25}, "eye": {"openness": 1, "offset_x": 12, "offset_y": 6}},
+    {"name": "groove_04", "label": "교대 스윙", "beat": 4, "sound": "snare", "duration_ms": 600, "relative": {"head": -12, "crown": 0, "right_shoulder_x": 20, "right_shoulder_y": 22, "left_shoulder_x": 40, "left_shoulder_y": 22}, "eye": {"openness": 1, "offset_x": 7, "offset_y": 3}},
+    {"name": "groove_05", "label": "교대 스윙", "beat": 5, "sound": "kick", "duration_ms": 600, "relative": {"head": 20, "crown": 0, "right_shoulder_x": 55, "right_shoulder_y": 25, "left_shoulder_x": 10, "left_shoulder_y": 25}, "eye": {"openness": 1, "offset_x": -12, "offset_y": 6}},
+    {"name": "groove_06", "label": "교대 스윙", "beat": 6, "sound": "snare", "duration_ms": 600, "relative": {"head": 12, "crown": 0, "right_shoulder_x": 40, "right_shoulder_y": 22, "left_shoulder_x": 20, "left_shoulder_y": 22}, "eye": {"openness": 1, "offset_x": -7, "offset_y": 3}},
+    {"name": "groove_07", "label": "교대 스윙", "beat": 7, "sound": "kick", "duration_ms": 600, "relative": {"head": -20, "crown": 0, "right_shoulder_x": 10, "right_shoulder_y": 25, "left_shoulder_x": 55, "left_shoulder_y": 25}, "eye": {"openness": 1, "offset_x": 12, "offset_y": 6}},
+    {"name": "groove_08", "label": "정면 모으기", "beat": 8, "sound": "snare", "duration_ms": 600, "relative": {"head": 0, "crown": 0, "right_shoulder_x": 25, "right_shoulder_y": 20, "left_shoulder_x": 25, "left_shoulder_y": 20}, "eye": {"openness": 1, "offset_x": 0, "offset_y": 0}},
+    {"name": "groove_09", "label": "양팔 리듬", "beat": 9, "sound": "kick", "duration_ms": 600, "relative": {"head": 0, "crown": 0, "right_shoulder_x": 45, "right_shoulder_y": 35, "left_shoulder_x": 45, "left_shoulder_y": 35}, "eye": {"openness": 0.65, "offset_x": 0, "offset_y": 0}},
+    {"name": "groove_10", "label": "양팔 리듬", "beat": 10, "sound": "snare", "duration_ms": 600, "relative": {"head": 0, "crown": 0, "right_shoulder_x": 20, "right_shoulder_y": 20, "left_shoulder_x": 20, "left_shoulder_y": 20}, "eye": {"openness": 1, "offset_x": 0, "offset_y": 0}},
+    {"name": "groove_11", "label": "양팔 리듬", "beat": 11, "sound": "kick", "duration_ms": 600, "relative": {"head": 0, "crown": 0, "right_shoulder_x": 45, "right_shoulder_y": 35, "left_shoulder_x": 45, "left_shoulder_y": 35}, "eye": {"openness": 0.65, "offset_x": 0, "offset_y": 0}},
+    {"name": "groove_12", "label": "양팔 리듬", "beat": 12, "sound": "snare", "duration_ms": 600, "relative": {"head": 0, "crown": 0, "right_shoulder_x": 20, "right_shoulder_y": 20, "left_shoulder_x": 20, "left_shoulder_y": 20}, "eye": {"openness": 1, "offset_x": 0, "offset_y": 0}},
+    {"name": "groove_13", "label": "대각선 포즈", "beat": 13, "sound": "kick", "duration_ms": 600, "relative": {"head": 20, "crown": -8, "right_shoulder_x": 50, "right_shoulder_y": 35, "left_shoulder_x": 15, "left_shoulder_y": 10}, "eye": {"openness": 1, "offset_x": -12, "offset_y": 6}},
+    {"name": "groove_14", "label": "대각선 포즈", "beat": 14, "sound": "snare", "duration_ms": 600, "relative": {"head": -20, "crown": 8, "right_shoulder_x": 15, "right_shoulder_y": 10, "left_shoulder_x": 50, "left_shoulder_y": 35}, "eye": {"openness": 1, "offset_x": 12, "offset_y": 6}},
+    {"name": "groove_15", "label": "마지막 포즈", "beat": 15, "sound": "kick", "duration_ms": 600, "relative": {"head": 0, "crown": 0, "right_shoulder_x": 30, "right_shoulder_y": 30, "left_shoulder_x": 30, "left_shoulder_y": 30}, "eye": {"openness": 0.7, "offset_x": 0, "offset_y": 0}},
+    {"name": "groove_16", "label": "포즈 · 깜박임", "beat": 16, "sound": "hat", "duration_ms": 600, "relative": {"head": 0, "crown": 0, "right_shoulder_x": 30, "right_shoulder_y": 30, "left_shoulder_x": 30, "left_shoulder_y": 30}, "eye": "blink"},
+    {"name": "groove_return", "label": "기본 자세", "duration_ms": 1200, "relative": {"head": 0, "crown": 0, "right_shoulder_x": 0, "right_shoulder_y": 0, "left_shoulder_x": 0, "left_shoulder_y": 0}, "eye": {"openness": 1, "offset_x": 0, "offset_y": 0}}
+  ]
+}

@@ -16,11 +16,12 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import subprocess
 import sys
 import time
 from typing import Optional
 
-from gpiozero import Button
+from gpiozero import Button, LED
 
 import config
 from audio_player import (
@@ -41,6 +42,8 @@ FULL_RANGE_HEAD_MAX_DEG = 180
 FULL_RANGE_START_DURATION_MS = 1000
 FULL_RANGE_SWEEP_DURATION_MS = 2000
 FULL_RANGE_PAUSE_SEC = 0.5
+
+_poweroff_requested = False
 
 
 def _require_angle(name: str, value: Optional[int], minimum: int, maximum: int) -> int:
@@ -96,6 +99,24 @@ def validate_runtime_config() -> None:
         config.ARM_SAFE_MIN_DEG,
         config.ARM_SAFE_MAX_DEG,
     )
+    _require_angle(
+        "CAMERA_CENTER_DEG",
+        config.CAMERA_CENTER_DEG,
+        config.CAMERA_SAFE_MIN_DEG,
+        config.CAMERA_SAFE_MAX_DEG,
+    )
+    _require_angle(
+        "CAMERA_LEFT_DEG",
+        config.CAMERA_LEFT_DEG,
+        config.CAMERA_SAFE_MIN_DEG,
+        config.CAMERA_SAFE_MAX_DEG,
+    )
+    _require_angle(
+        "CAMERA_RIGHT_DEG",
+        config.CAMERA_RIGHT_DEG,
+        config.CAMERA_SAFE_MIN_DEG,
+        config.CAMERA_SAFE_MAX_DEG,
+    )
 
     _require_audio(config.AUDIO_NAME_CALL)
     _require_audio(config.AUDIO_LETS_PLAY)
@@ -117,26 +138,20 @@ def run_demo_sequence(controller: SerialController) -> None:
     """
     print("\n[Sequence] 시작")
 
-    print("[Sequence] 고개를 로봇 기준 왼쪽으로 회전")
-    controller.move_head(
+    print("[Sequence] 고개 회전 + 오른팔 상승 + 01_name_call.wav 재생")
+    pending_motion = controller.move_both(
         config.HEAD_LEFT_DEG,
-        config.HEAD_TURN_DURATION_MS,
-    )
-
-    time.sleep(config.AFTER_HEAD_TURN_PAUSE_SEC)
-
-    print("[Sequence] 오른팔 상승 + 01_name_call.wav 재생")
-    pending_arm = controller.move_arm(
         config.ARM_UP_DEG,
-        config.ARM_RAISE_DURATION_MS,
         wait=False,
+        duration_ms=config.HEAD_TURN_DURATION_MS,
     )
     audio_process = play_wav_async(config.AUDIO_NAME_CALL)
 
-    # 팔 움직임과 음성이 모두 끝난 뒤 다음 문장으로 넘어갑니다.
-    controller.wait_for_done(pending_arm)
+    # 고개/팔 움직임과 음성이 모두 끝난 뒤 다음 문장으로 넘어갑니다.
+    controller.wait_for_done(pending_motion)
     wait_for_audio(audio_process)
 
+    time.sleep(config.AFTER_HEAD_TURN_PAUSE_SEC)
     time.sleep(config.BETWEEN_AUDIO_PAUSE_SEC)
 
     print("[Sequence] 02_lets_play.wav 재생")
@@ -150,10 +165,35 @@ def run_demo_sequence(controller: SerialController) -> None:
     print("[Sequence] 완료\n")
 
 
+def run_camera_sequence(controller: SerialController) -> None:
+    """카메라 좌우 회전 서보만 천천히 움직입니다."""
+    print("\n[Camera] 시작")
+
+    print("[Camera] 왼쪽으로 이동")
+    controller.move_camera(
+        config.CAMERA_LEFT_DEG,
+        config.CAMERA_SWEEP_DURATION_MS,
+    )
+
+    print("[Camera] 오른쪽으로 이동")
+    controller.move_camera(
+        config.CAMERA_RIGHT_DEG,
+        config.CAMERA_SWEEP_DURATION_MS,
+    )
+
+    print("[Camera] 중앙으로 복귀")
+    controller.move_camera(
+        config.CAMERA_CENTER_DEG,
+        config.CAMERA_RETURN_DURATION_MS,
+    )
+
+    print("[Camera] 완료\n")
+
+
 def run_neck_sweep_once() -> None:
     """
     SSH 수동 점검용 일회성 고개 전체 범위 이동.
-    팔 서보는 움직이지 않습니다.
+    팔과 카메라 서보는 움직이지 않습니다.
     """
     print("[Neck sweep] Arduino USB Serial 연결")
     with SerialController() as controller:
@@ -182,6 +222,42 @@ def run_neck_sweep_once() -> None:
 
         print("[Neck sweep] 이동 완료 응답 확인")
         print("[Neck sweep] 완료")
+
+
+def request_poweroff() -> None:
+    """
+    전원 OFF 버튼용 안전 종료 요청.
+
+    Raspberry Pi에서 hyunwoo 사용자가 shutdown 명령만 비밀번호 없이
+    실행할 수 있도록 sudoers 설정이 되어 있어야 합니다.
+    """
+    global _poweroff_requested
+
+    if _poweroff_requested:
+        return
+
+    _poweroff_requested = True
+
+    print("[Power] 전원 OFF 버튼 입력")
+    print("[Power] Raspberry Pi 안전 종료 요청")
+
+    try:
+        subprocess.run(
+            ["sudo", "-n", "shutdown", "-h", "now"],
+            check=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        print(
+            "[Power] 종료 명령 실패: sudo 비밀번호 없는 shutdown 권한이 "
+            f"필요합니다. 종료 코드={exc.returncode}"
+        )
+        _poweroff_requested = False
+
+
+def wait_until_released(button: Button) -> None:
+    if button.is_pressed:
+        button.wait_for_release()
+    time.sleep(0.10)
 
 
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
@@ -228,11 +304,24 @@ def main(argv: Optional[list[str]] = None) -> int:
     print("[Robot demo] 설정 확인")
     validate_runtime_config()
 
-    button = Button(
+    demo_button = Button(
         config.BUTTON_GPIO,
         pull_up=True,
         bounce_time=config.BUTTON_BOUNCE_SEC,
     )
+    power_off_button = Button(
+        config.POWER_OFF_BUTTON_GPIO,
+        pull_up=True,
+        bounce_time=config.BUTTON_BOUNCE_SEC,
+    )
+    camera_button = Button(
+        config.CAMERA_BUTTON_GPIO,
+        pull_up=True,
+        bounce_time=config.BUTTON_BOUNCE_SEC,
+    )
+    camera_led = LED(config.CAMERA_LED_GPIO)
+    camera_led.off()
+    power_off_button.when_pressed = request_poweroff
 
     try:
         with SerialController() as controller:
@@ -250,35 +339,46 @@ def main(argv: Optional[list[str]] = None) -> int:
             print("[Robot demo] 버튼 입력 대기")
 
             while True:
-                # 시퀀스 실행 중에는 이 줄로 돌아오지 않으므로
-                # 추가 버튼 입력은 자동으로 무시됩니다.
-                button.wait_for_press()
-
-                try:
-                    run_demo_sequence(controller)
-
-                except (SerialControllerError, AudioPlayerError) as exc:
-                    print(f"[Robot demo error] {exc}")
-                    print("[Robot demo] 가능한 경우 초기 자세 복귀 시도")
-
+                if camera_button.is_pressed:
+                    camera_led.on()
                     try:
-                        move_home(controller)
-                    except Exception as home_exc:
-                        print(f"[Robot demo] 복귀 실패: {home_exc}")
+                        run_camera_sequence(controller)
+                    except SerialControllerError as exc:
+                        print(f"[Camera error] {exc}")
+                    finally:
+                        camera_led.off()
 
-                # 버튼을 계속 누른 상태에서 시퀀스가 다시 실행되지 않도록
-                # 손을 뗄 때까지 기다립니다.
-                if button.is_pressed:
-                    button.wait_for_release()
+                    wait_until_released(camera_button)
+                    print("[Robot demo] 버튼 입력 대기")
+                    continue
 
-                time.sleep(0.10)
-                print("[Robot demo] 버튼 입력 대기")
+                if demo_button.is_pressed:
+                    try:
+                        run_demo_sequence(controller)
+
+                    except (SerialControllerError, AudioPlayerError) as exc:
+                        print(f"[Robot demo error] {exc}")
+                        print("[Robot demo] 가능한 경우 초기 자세 복귀 시도")
+
+                        try:
+                            move_home(controller)
+                        except Exception as home_exc:
+                            print(f"[Robot demo] 복귀 실패: {home_exc}")
+
+                    wait_until_released(demo_button)
+                    print("[Robot demo] 버튼 입력 대기")
+                    continue
+
+                time.sleep(0.05)
 
     except KeyboardInterrupt:
         print("\n[Robot demo] 사용자 종료")
 
     finally:
-        button.close()
+        demo_button.close()
+        power_off_button.close()
+        camera_button.close()
+        camera_led.close()
 
     return 0
 

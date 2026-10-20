@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>CUVO 관절 시뮬레이터</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="browser.bundle.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="identity"><span class="brand-mark" aria-hidden="true"><i data-lucide="bot"></i></span><h1>CUVO <span>관절 시뮬레이터</span></h1></div>
+    <div class="connection-state"><span aria-hidden="true"></span>로봇 연결 없음</div>
+  </header>
+  <main class="workspace">
+    <section class="stage" aria-label="CUVO 3D 모델">
+      <div class="stage-toolbar">
+        <div class="view-options" role="group" aria-label="관찰 방향">
+          <button type="button" data-view="perspective" aria-pressed="true">입체</button>
+          <button type="button" data-view="front" aria-pressed="false">정면</button>
+          <button type="button" data-view="side" aria-pressed="false">측면</button>
+          <button type="button" data-view="top" aria-pressed="false">위</button>
+        </div>
+        <button class="icon-button" id="reset-view" type="button" aria-label="시점 초기화" data-tooltip="시점 초기화"><i data-lucide="scan"></i></button>
+      </div>
+      <div id="viewport" role="img" aria-label="두 팔과 고개, 정수리 카메라의 관절을 표시하는 3D CUVO 모델"></div>
+      <div class="stage-bottom">
+        <div class="stage-caption"><span class="small-dot"></span>단순화 모델 <span class="caption-divider">/</span> 로봇 기준 좌우</div>
+        <label class="axes-switch"><input type="checkbox" id="show-axes">축 표시</label>
+      </div>
+      <section class="playback" aria-label="안무 미리보기">
+        <div class="playback-heading">
+          <select id="dance-select" aria-label="안무 선택"></select>
+          <span id="dance-meta"></span>
+        </div>
+        <div class="transport">
+          <button type="button" class="icon-button primary" id="preview-dance" aria-label="춤 재생" data-tooltip="재생" disabled><i data-lucide="play"></i></button>
+          <button type="button" class="icon-button" id="restart-dance" aria-label="처음부터 재생" data-tooltip="처음부터"><i data-lucide="rotate-ccw"></i></button>
+          <button type="button" class="icon-button" id="stop-dance" aria-label="재생 정지" data-tooltip="정지"><i data-lucide="square"></i></button>
+          <select id="playback-speed" aria-label="재생 속도"><option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="1" selected>1x</option></select>
+          <label class="sound-switch"><input type="checkbox" id="play-sound">소리</label>
+          <output id="playback-time">0:00 / 0:00</output>
+        </div>
+        <input type="range" id="timeline" min="0" max="1" value="0" step="20" aria-label="재생 위치">
+        <div class="preview-status"><span id="preview-state" aria-live="polite">준비 중</span><span id="beat-state"></span></div>
+        <div class="eye-monitor" aria-label="OLED 출력">
+          <figure><canvas id="eye-viewer-left" width="128" height="128" aria-label="정면 왼쪽 눈 CE1"></canvas><figcaption>CE1 · 로봇 오른눈</figcaption></figure>
+          <figure><canvas id="eye-viewer-right" width="128" height="128" aria-label="정면 오른쪽 눈 CE0"></canvas><figcaption>CE0 · 로봇 왼눈</figcaption></figure>
+          <div class="source-status"><span>실행 코드 기록</span><code id="source-hash"></code><span id="audio-status"></span></div>
+        </div>
+      </section>
+      <div id="render-error" role="alert" hidden></div>
+    </section>
+    <aside class="parameters" aria-label="관절 각도 설정">
+      <div class="panel-heading"><div><h2>관절 각도</h2><span class="panel-subtitle">6축 · CH0–CH5</span></div><button class="icon-button" type="button" id="reset-pose" aria-label="기본 자세" data-tooltip="기본 자세"><i data-lucide="rotate-ccw"></i></button></div>
+      <div class="angle-mode" role="group" aria-label="입력 각도 기준">
+        <button type="button" data-mode="relative" aria-pressed="true">상대각도</button>
+        <button type="button" data-mode="servo" aria-pressed="false">서보 명령값</button>
+      </div>
+      <div id="joint-controls"></div>
+      <section class="passive-joints" aria-label="수동 고정 팔꿈치">
+        <h3 class="group-title">팔꿈치 <span class="passive-label">수동 고정</span></h3>
+        <div id="elbow-controls"></div>
+      </section>
+      <div class="panel-note">사용자 지정 범위 · 실물 충돌 검증 제외</div>
+    </aside>
+  </main>
+  <div id="angle-announcement" class="sr-only" aria-live="polite"></div>
+</body>
+</html>

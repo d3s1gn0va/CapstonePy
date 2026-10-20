@@ -10,6 +10,7 @@ SSH_KEY="$HOME/.ssh/robotpi_ed25519"
 REMOTE_ROBOT_DIR="/home/hyunwoo/robot_demo"
 REMOTE_BUILD_DIR="/home/hyunwoo/capstone-robot-build/servo_controller"
 ARDUINO_FQBN="arduino:avr:mega"
+ARDUINO_CLI="/home/hyunwoo/.local/bin/arduino-cli"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOCAL_ARDUINO_DIR="$PROJECT_ROOT/arduino/servo_controller"
 
@@ -39,7 +40,7 @@ rsync -av --delete \
   "$PI_HOST:$REMOTE_BUILD_DIR/"
 
 ssh -i "$SSH_KEY" "$PI_HOST" \
-  "REMOTE_ROBOT_DIR='$REMOTE_ROBOT_DIR' REMOTE_BUILD_DIR='$REMOTE_BUILD_DIR' ARDUINO_FQBN='$ARDUINO_FQBN' bash -s" <<'REMOTE_SCRIPT'
+  "REMOTE_ROBOT_DIR='$REMOTE_ROBOT_DIR' REMOTE_BUILD_DIR='$REMOTE_BUILD_DIR' ARDUINO_FQBN='$ARDUINO_FQBN' ARDUINO_CLI='$ARDUINO_CLI' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
 
 find_arduino_port() {
@@ -69,8 +70,8 @@ if [ -z "$PORT" ]; then
 fi
 
 echo "Using Arduino port: $PORT"
-arduino-cli compile --fqbn "$ARDUINO_FQBN" "$REMOTE_BUILD_DIR"
-arduino-cli upload -p "$PORT" --fqbn "$ARDUINO_FQBN" "$REMOTE_BUILD_DIR"
+"$ARDUINO_CLI" compile --fqbn "$ARDUINO_FQBN" "$REMOTE_BUILD_DIR"
+"$ARDUINO_CLI" upload -p "$PORT" --fqbn "$ARDUINO_FQBN" "$REMOTE_BUILD_DIR"
 
 echo "Waiting for Arduino reset..."
 sleep 3

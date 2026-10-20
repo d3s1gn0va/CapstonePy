@@ -5,6 +5,7 @@ __pycache__/
 *.log
 .env
 .env.*
+scripts/local.env
 .venv/
 .vscode/
 .idea/
@@ -20,3 +21,10 @@ id_ed25519
 *password*
 *passwd*
 *secret*
+credentials.json
+registration.json
+ble-credentials.json
+.cuvo/
+tools/servo-simulator/node_modules/
+tools/servo-simulator/test-output/
+tools/servo-simulator/simulation-data.json

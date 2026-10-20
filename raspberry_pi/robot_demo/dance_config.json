@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "arm_x_min_relative_deg": 0,
+  "arm_x_max_relative_deg": 80,
+  "arm_y_raise_relative_deg": 45,
+  "head_left_deg": 60,
+  "head_right_deg": 120,
+  "swing_duration_ms": 550,
+  "raise_duration_ms": 1200,
+  "return_duration_ms": 1800,
+  "cycles": 4,
+  "gaze_horizontal_px": 14,
+  "gaze_down_px": 8,
+  "response_hold_seconds": 3
+}

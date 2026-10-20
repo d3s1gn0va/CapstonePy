@@ -1,0 +1,19 @@
+{
+  "schema_version": 2,
+  "va_side_mm": 28.86,
+  "aa_side_mm": 26.86,
+  "aperture_file": "oled_aperture.json",
+  "aperture_expand_px": 3,
+  "iris_bounds_px": [29, 7, 122, 125],
+  "stroke_px": 10,
+  "contrast": 255,
+  "open_seconds": 3.0,
+  "close_seconds": 0.12,
+  "closed_seconds": 0.08,
+  "reopen_seconds": 0.22,
+  "fps": 30,
+  "gaze_width_ratio": 0.3,
+  "gaze_move_seconds": 0.2,
+  "gaze_hold_seconds": 0.8,
+  "gaze_center_seconds": 1.0
+}

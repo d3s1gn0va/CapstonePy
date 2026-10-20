@@ -6,6 +6,7 @@ Arduino 코드에서 지원하는 텍스트 명령:
 - STATUS
 - MOVE_HEAD,<angle_deg>,<duration_ms>
 - MOVE_ARM,<angle_deg>,<duration_ms>
+- MOVE_CAMERA,<angle_deg>,<duration_ms>
 - MOVE_BOTH,<head_angle_deg>,<arm_angle_deg>,<duration_ms>
 - STOP
 - DISABLE
@@ -281,6 +282,22 @@ class SerialController:
             self.wait_for_done(pending)
         return pending
 
+    def move_camera(
+        self,
+        angle_deg: int,
+        duration_ms: int,
+        wait: bool = True,
+    ) -> PendingMotion:
+        pending = self._start_motion(
+            command=f"MOVE_CAMERA,{angle_deg},{duration_ms}",
+            ack_message="ACK,MOVE_CAMERA",
+            done_message="DONE,MOVE_CAMERA",
+            duration_ms=duration_ms,
+        )
+        if wait:
+            self.wait_for_done(pending)
+        return pending
+
     def move_both(
         self,
         head_angle_deg: int,
@@ -297,6 +314,48 @@ class SerialController:
             done_message="DONE,MOVE_BOTH",
             duration_ms=duration_ms,
         )
+        if wait:
+            self.wait_for_done(pending)
+        return pending
+
+    def group_capabilities(self) -> dict[int, tuple[int, int, int]]:
+        self._drain_input()
+        self._write_line("CAPS")
+        deadline = time.monotonic() + config.SERIAL_ACK_TIMEOUT_SEC
+        while True:
+            line = self._read_nonempty_line_until(deadline)
+            if line is None:
+                raise SerialControllerError("CAPS response timeout")
+            if line.startswith("ERR"):
+                raise SerialControllerError(f"Six-axis firmware required: {line}")
+            if not line.startswith("CAPS,MOVE_GROUP,"):
+                continue
+            try:
+                result = {}
+                for item in line.split(",")[2:]:
+                    channel, low, high, neutral = map(int, item.split(":"))
+                    if channel in result:
+                        raise ValueError("Duplicate channel")
+                    result[channel] = (low, high, neutral)
+                if set(result) != set(range(6)):
+                    raise ValueError("Expected six channels")
+                return result
+            except ValueError as exc:
+                raise SerialControllerError("Invalid CAPS response") from exc
+
+    def move_group(self, targets: dict[int, int], duration_ms: int, wait: bool = True) -> PendingMotion:
+        if not isinstance(targets, dict) or not 1 <= len(targets) <= 6:
+            raise ValueError("One to six distinct channel targets are required")
+        if type(duration_ms) is not int or not 1 <= duration_ms <= 60000:
+            raise ValueError("Group duration must be 1..60000ms")
+        for channel, angle in targets.items():
+            if type(channel) is not int or not 0 <= channel <= 5:
+                raise ValueError("Group channel must be 0..5")
+            if type(angle) is not int or not 0 <= angle <= 180:
+                raise ValueError("Group angle must be 0..180")
+        pairs = ",".join(f"{channel},{targets[channel]}" for channel in sorted(targets))
+        pending = self._start_motion(f"MOVE_GROUP,{duration_ms},{pairs}",
+                                     "ACK,MOVE_GROUP", "DONE,MOVE_GROUP", duration_ms)
         if wait:
             self.wait_for_done(pending)
         return pending

@@ -1,62 +1,82 @@
 # Capstone Robot Project
 
-Raspberry Pi 4, Arduino Mega 2560, PCA9685를 사용하는 캡스톤디자인 로봇 프로젝트의 Mac 기준 저장소입니다.
+**최신 소스 인수인계 (2026-10-20):** 6축·BLE·OLED·앱 연동과 3D 미리보기를 포함한 소스 기준은 [CURRENT_SOURCE.md](CURRENT_SOURCE.md)를 먼저 읽는다. 앱 저장소와 같은 기준 태그를 사용한다. 아래 날짜별 설명의 과거 3채널/미구현 기록보다 최신 상태 문서가 우선한다.
 
-## 기준 경로
+산업디자인 캡스톤디자인 로봇 프로젝트의 단일 기준 저장소입니다. 새 Codex 대화를 시작하면 먼저 `AGENTS.md`와 `docs/00_PROJECT_BRIEF.md`를 읽고 현재 상태를 파악합니다.
 
-* Mac 프로젝트 루트: `/Users/hyunwoo/Documents/capstone design/capstone-robot-project`
-* Raspberry Pi SSH 주소: `hyunwoo@192.168.0.39`
-* SSH 개인키 경로: `~/.ssh/robotpi_ed25519`
-* Raspberry Pi 실행 코드 경로: `/home/hyunwoo/robot_demo`
-* Arduino 원격 빌드 임시 경로: `/home/hyunwoo/capstone-robot-build/servo_controller`
-* Arduino Mega FQBN: `arduino:avr:mega`
+## 프로젝트 요약
 
-이 Mac 프로젝트가 원본 저장소입니다. Raspberry Pi의 `/home/hyunwoo/robot_demo`는 실제 실행본이며, 배포 스크립트를 통해 이 저장소의 Raspberry Pi 코드를 복사해 실행 환경에 반영합니다.
+**2026-10-13 새 원점 배포:** 오른팔 X 45, 왼팔 X 135, 왼팔 Y 180으로 상대 0을 변경했습니다. 양팔 X 명령 범위 0..180/상대 -45..135, 왼팔 Y 135..180/상대 0..45입니다. Pi/Arduino 업로드 검증/PING/CAPS와 원점 이동 명령 완료, 정상 서비스 종료 복귀 및 대기 유지 확인을 마쳤습니다. 실제 새 자세의 사용자 관찰과 전체 OS 재부팅/종료 검증은 남아 있습니다. [현재 상태](docs/09_CURRENT_STATE.md)를 우선합니다.
 
-WAV 파일은 현재 시연에 필요하므로 `raspberry_pi/robot_demo/audio/` 아래에 포함합니다. 로그, `.env`, SSH 키, 토큰, 비밀번호, macOS 메타데이터 파일은 Git에 포함하지 않습니다.
+**눈 대기:** 춤이 정상 완료되면 정면에서 약 3초 간격으로 계속 깜박이고 다음 시작 버튼을 기다립니다. Pi에 반영했으며 대기 중 서보/음성은 실행하지 않습니다. 다음 춤은 눈 대기를 종료한 후 시작합니다. 기존 눈 매핑/두께/밝기는 유지합니다.
 
-오디오는 Raspberry Pi OS의 현재 출력 설정을 따르도록 `pw-play`를 우선 사용합니다. `audio_player.py`는 `pw-play`가 없을 때만 `aplay`로 fallback합니다.
+**2026-10-06 최신 상태:** 오프라인 Bluetooth 부팅 대기와 등록된 iPhone 재인증/재연결을 구현해 Pi와 iPhone에 배포했습니다. 최초 한 번 코드로 등록하고 이후에는 저장된 인증 정보로 연결합니다. 실제 Pi 재부팅 뒤 부팅 약 16초 자동 대기 시작, 앱 재실행 후 코드 없는 제어 연결을 확인했습니다. 부팅/연결 자체로 서보를 움직이지 않으며 최신 550ms/팔 X 상대 0..60 춤은 앱의 명시적 시작만 허용합니다. 옛 전시 자동 실행은 비활성 원본으로 보존하고 새 사용자 서비스를 활성화했습니다. Arduino/PWM은 변경하지 않았습니다. 사운드카드 재연결·완전한 무인터넷 실물 춤 검증은 남아 있습니다. [Bluetooth 운용과 안전 한계](docs/21_BLUETOOTH_CONTROL.md)가 아래 이전 기록보다 우선합니다.
 
-## Python 설정 수정 흐름
+이 프로젝트는 아이의 일상 속 자연스러운 상호작용을 유도하고, 사회적 의사소통 행동을 반복적으로 관찰할 수 있는 가정용 상호작용 로봇 경험을 제안합니다. 현재 목표는 1차 심사용 워킹 프로토타입입니다.
 
-1. `raspberry_pi/robot_demo/config.py`에서 목표 각도, 이동 시간, 시리얼 설정을 수정합니다.
-2. `scripts/check_python.sh`로 Python 문법 검사를 실행합니다.
-3. 문제가 없으면 `scripts/deploy_pi.sh`로 Raspberry Pi에 배포합니다.
-4. 필요할 때 `scripts/restart_robot.sh`로 실행 프로그램을 재시작합니다.
-5. `scripts/status_robot.sh`와 `scripts/logs_robot.sh`로 상태와 로그를 확인합니다.
+로봇 이름은 CUVO입니다. 구성은 고개 1축, 카메라가 달린 정수리 1축, 양팔 어깨 X/Y 4축의 **서보 총 6개**, SH1107 눈 화면 두 장, CSI 카메라, USB 전원/AUX 스피커입니다. 오른팔 X는 사용자 확인에 따라 SG90으로 교체됐으며 나머지 5개는 SG92R입니다.
 
-`deploy_pi.sh`는 `check_python.sh`를 먼저 실행하고, `.env`, 로그, `__pycache__`, `.DS_Store`, `._*` 파일을 제외한 뒤 `/home/hyunwoo/robot_demo/`로 rsync합니다. Arduino 업로드는 하지 않습니다.
+Raspberry Pi가 버튼, 눈, 카메라, 음성, 전체 타임라인을 맡고 Arduino Mega가 USB Serial 명령을 받아 PCA9685로 서보를 제어하는 구조입니다. **최신 춤 설정:** 고개 60~120도와 양팔 상대 X 0~80도 교대/Y 45도 상승, 같은 방향의 아래 대각선 시선을 묶습니다. 한쪽 이동 550ms/좌→우 4회/눈 가로 14px를 유지했고 Mac/Pi에 반영해 새 춤 1회 명령 완료 및 눈 대기 복원을 확인했습니다. 실제 연출 평가는 사용자 확인이 필요합니다. [춤 동작과 BLE 연결 계획](docs/20_DANCE_SESSION.md), [최신 상태](docs/09_CURRENT_STATE.md)를 먼저 읽습니다.
 
-## Arduino 펌웨어 수정 흐름
+**이전 650ms/팔 상대 0~45도 춤은 별도 Pi 시험 폴더에서 한 번 실행했습니다.** Mega 펌웨어 업로드 검증/PING/CAPS를 확인했고 실행은 21.15초/error 없음으로 끝났으며 사용자가 "다 잘 됐어"로 시연을 확인했습니다. 기존 전시 폴더의 통합 배포, 자동 실행과 앱/BLE 연결은 미완료이며 정식 기구·전원 확인 플래그는 false 그대로입니다. 고개와 정수리는 최신 기준 45~135도/정면 90도입니다. 기존 `main.py`와 자동 실행 설정은 이번 작업에서 변경하지 않았고, 새 기구 기준과 다른 예전 프로그램을 재시작하지 않습니다. Serial 완료 응답은 실제 위치 측정이 아닙니다.
 
-1. `arduino/servo_controller/servo_controller.ino`를 수정합니다.
-2. 안전 범위 확장, 펄스 폭 변경, 큰 각도 테스트는 먼저 충돌과 과부하 위험을 검토합니다.
-3. `scripts/build_arduino_remote.sh`로 Raspberry Pi에 Arduino 코드를 복사하고 컴파일까지만 확인합니다.
-4. 실제 Arduino Mega 업로드는 사용자가 별도로 `Arduino 업로드 승인`이라고 명확히 말한 경우에만 진행합니다.
-5. 업로드 스크립트는 `scripts/flash_arduino_remote.sh`입니다. 실행 시에도 정확한 승인 문구를 다시 입력해야 합니다.
+## 전시 시연 흐름
 
-Arduino USB 포트는 고정하지 않고 `/dev/serial/by-id/*`, `/dev/ttyACM*`, `/dev/ttyUSB*` 순서로 탐색합니다.
+전시에서는 네트워크 없이 독립 작동해야 합니다. 전원을 켜면 Raspberry Pi가 자동 부팅되고 프로그램이 실행되어 시연 버튼 입력을 기다리는 구성이 목표입니다.
 
-## 주요 스크립트
+기존 `main.py`의 버튼 동작은 아래와 같으며 이번 작업에서 변경하지 않았습니다.
 
-* `scripts/import_from_pi.sh`: Raspberry Pi의 기존 `~/robot_demo/`를 Mac 프로젝트로 가져옵니다.
-* `scripts/check_python.sh`: Raspberry Pi Python 코드 문법을 검사합니다. macOS AppleDouble `._*` 파일은 건너뜁니다.
-* `scripts/deploy_pi.sh`: Python 코드와 오디오 파일을 Raspberry Pi 실행 폴더로 배포합니다.
-* `scripts/restart_robot.sh`: Raspberry Pi 로봇 실행 프로그램을 재시작합니다.
-* `scripts/stop_robot.sh`: Raspberry Pi 로봇 실행 프로그램만 중지합니다.
-* `scripts/status_robot.sh`: 실행 상태, `pw-play` 존재 여부, Arduino USB Serial 후보, 최근 로그를 확인합니다.
-* `scripts/logs_robot.sh`: Raspberry Pi 로봇 로그를 실시간으로 확인합니다.
-* `scripts/setup_pi_runtime.sh`: Raspberry Pi 런타임 패키지 설치 명령을 실행합니다.
-* `scripts/setup_pi_autostart.sh`: Desktop Autologin 이후 사용자 자동 실행 구성을 준비합니다.
-* `scripts/build_arduino_remote.sh`: Arduino 코드를 `/home/hyunwoo/capstone-robot-build/servo_controller`로 복사하고 `arduino:avr:mega` 대상으로 컴파일합니다. 업로드는 하지 않습니다.
-* `scripts/flash_arduino_remote.sh`: 위험 경고와 승인 문구 확인 후 Arduino Mega에 업로드합니다. 업로드 전 로봇 프로그램을 중지하고, 업로드 후 `PING` 응답 `ACK,PING`을 확인한 뒤 재시작 절차를 안내합니다.
+1. 고개 회전과 기존 오른팔 상승을 함께 시작하면서 `01_name_call.wav` 재생
+2. 이동/첫 음성 완료 후 대기하고 `02_lets_play.wav` 재생
+3. 짧게 유지 후 고개와 기존 오른팔을 초기 자세로 복귀
 
-## 폴더 구성
+이는 이전 3채널 시퀀스입니다. 새 춤은 별도 `integrated_demo.py`의 `dance` 동작으로 구현했으며 앱/BLE 시작 버튼 연결과 전시 자동 실행 전환은 아직 하지 않았습니다.
 
-* `AGENTS.md`: 작업 시 지켜야 할 Raspberry Pi, Arduino, 서보 안전 규칙.
-* `README.md`: 프로젝트 구조와 파일 역할 설명.
-* `.gitignore`: Git에 포함하지 않을 로컬 설정, 캐시, 로그, 비밀 파일 목록.
-* `raspberry_pi/robot_demo/`: Raspberry Pi에서 실행되는 Python 코드와 WAV 오디오 파일.
-* `arduino/servo_controller/servo_controller.ino`: Arduino Mega 2560에서 PCA9685를 제어하는 서보 컨트롤러 펌웨어.
-* `scripts/`: 가져오기, 검사, 배포, 상태 확인, Arduino 빌드/업로드 스크립트.
-* `docs/`: 초기 import 점검, 배포 가이드, 하드웨어 안전 규칙 문서.
+시연 중 추가 버튼 입력은 무시됩니다. 철수 시에는 Raspberry Pi 안전 종료 후 전체 전원을 끄는 운용이 필요합니다.
+
+추가 버튼 구성:
+
+* 전원 OFF 버튼: Raspberry Pi 안전 종료 요청
+* 카메라 버튼: 고개와 팔은 움직이지 않고 카메라 서보만 천천히 좌우 이동 후 중앙 복귀
+
+## 주요 문서
+
+* `tools/servo-simulator/index.html`: 실제 순서 실행기의 기록을 재생하는 오프라인 3D 시뮬레이터. 새 16박 `CUVO Groove`, 기존 춤 비교, 수동 프리스탑 팔꿈치와 OLED/소리를 화면에서만 확인한다. [실행과 모델 한계](tools/servo-simulator/README.md)
+* `docs/00_PROJECT_BRIEF.md`: 프로젝트 전체 브리프
+* `docs/01_PRODUCT_CONCEPT.md`: 제품 경험과 사용자 맥락
+* `docs/02_ROBOT_DESIGN.md`: 외형, 기구 구조, 미확정 설계 항목
+* `docs/03_EXHIBITION_SCENARIO.md`: 전시 환경과 시연 흐름
+* `docs/04_SYSTEM_ARCHITECTURE.md`: 하드웨어/소프트웨어 역할 분리
+* `docs/05_HARDWARE_WIRING.md`: 코드와 문서에서 확인되는 배선 정보
+* `docs/06_SOFTWARE_BEHAVIOR.md`: Python/Arduino 동작 상세
+* `docs/07_REMOTE_DEVELOPMENT.md`: Mac 기준 원격 개발 구조
+* `docs/08_CALIBRATION_AND_SAFETY.md`: 캘리브레이션과 안전 규칙
+* `docs/09_CURRENT_STATE.md`: 완료/진행/다음 작업/위험/미확정 사항
+* `docs/10_DECISION_LOG.md`: 확인된 결정 기록
+* `docs/11_OPEN_QUESTIONS.md`: 확인이 필요한 질문
+* `docs/12_BUTTON_AND_SERVO_WIRING.md`: 버튼 3개와 서보 3개 배선 방법
+* `docs/13_OLED_EYE_TEST.md`: 승인된 단독 OLED 시험과 재실행 방법
+* `docs/14_DUAL_OLED_EYES.md`: SH1107 두 눈의 눈구멍 정렬, 배선, 깜박임 시험
+* `docs/15_EYE_MAPPING_AND_CONTROL.md`: 원본 CAD 매핑, 눈동자/눈구멍 분리, 반복 보정과 향후 연동 구조
+* `docs/16_FULL_SYSTEM_WIRING_PLAN.md`: SG92R 6개, OLED 두 장, 카메라, 스피커의 전체 핀맵과 전원 계획
+* `docs/17_EXHIBITION_AND_APP_PLAN.md`: 관람자 앱 체험, 로봇 동작 시나리오, 예시 기록, 중단/연결 정책과 구현 순서
+* `docs/18_ASSET_CHECKLIST.md`: 전시 앱의 필요한 에셋, 기존 자료, 준비 우선순위와 공개 사용 확인
+* `docs/19_ROBOT_INTEGRATION.md`: 앱 제외 로봇 동작 통합, 가상 실행, 6축 설정 잠금, 컴파일 결과와 실물 전환 순서
+* `docs/20_DANCE_SESSION.md`: 최신 6축 기준, 양팔 교대 춤, 새 음성, 오프라인 검사와 BLE 연결 계획
+* `docs/21_BLUETOOTH_CONTROL.md`: 기본 앱의 실제 BLE 연결, 임시 코드, 지정 춤, 정지/watchdog, 배포 및 검증 상태
+* `docs/22_OFFLINE_CHOREOGRAPHY_PREVIEW.md`: 실제 안무 코드와 3D 미리보기의 공유 구조, CUVO Groove, 수동 팔꿈치와 실물 전환 한계
+
+## 저장소 구조
+
+* `raspberry_pi/robot_demo/`: Raspberry Pi에서 실행되는 Python 코드와 WAV 오디오
+* `arduino/servo_controller/`: Arduino Mega + PCA9685 서보 컨트롤러 펌웨어
+* `scripts/`: 가져오기, Python 검사, 배포, 상태 확인, 원격 Arduino 빌드/업로드 스크립트
+* `docs/assets/`: 로봇 디자인, 배선, 전시, CAD export 자료를 보관할 자리
+
+## 안전 원칙
+
+Python 설정 변경과 Arduino 펌웨어 변경은 구분합니다. 2026-10-05 사용자 지시 "앞으로 그냥 바로 너가 업로드 해"에 따라 요청한 이 프로젝트의 코드 변경에 필요한 Arduino 업로드는 매번 재승인을 묻지 않고 진행할 수 있습니다. 검사/컴파일, 기존 프로그램 중지/포트 확인, 업로드 검증/PING/결과 보고는 유지합니다. PWM 펄스 폭 변경은 별도 승인 대상이며 요청하지 않은 실물 동작이나 자동 실행 전환은 진행하지 않습니다.
+
+고개 0도에서 180도 이동 요청은 현재 개발 시험 항목이며 최종 전시 동작으로 확정된 것이 아닙니다. 전체 범위 테스트는 기구물 충돌과 서보 과부하 위험이 있으므로 자동 실행하지 않습니다.
+
+SSH 키, 비밀번호, 토큰, `.env`, `scripts/local.env`, 로그 파일은 Git에 포함하지 않습니다. 기존 WAV 2개는 사용자가 공개 저장소 포함을 허용했습니다. 새 음성 5개도 WAV로 준비했으며 공개 배포 시 해당 음성의 사용 권리를 확인합니다. 이번 작업에서는 Git commit/push를 하지 않았습니다.

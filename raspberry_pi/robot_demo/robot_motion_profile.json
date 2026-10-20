@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "power_verified": false,
+  "axes": {
+    "head": {"channel": 0, "minimum": 45, "maximum": 135, "neutral": 90, "verified": false},
+    "right_shoulder_x": {
+      "channel": 1, "minimum": 0, "maximum": 180, "neutral": 45, "verified": false,
+      "joint": {"minimum": -45, "maximum": 135, "neutral": 0, "servo_zero": 45, "direction": 1}
+    },
+    "crown": {"channel": 2, "minimum": 45, "maximum": 135, "neutral": 90, "verified": false},
+    "right_shoulder_y": {
+      "channel": 3, "minimum": 0, "maximum": 45, "neutral": 0, "verified": false,
+      "joint": {"minimum": 0, "maximum": 45, "neutral": 0, "servo_zero": 0, "direction": 1}
+    },
+    "left_shoulder_x": {
+      "channel": 4, "minimum": 0, "maximum": 180, "neutral": 135, "verified": false,
+      "joint": {"minimum": -45, "maximum": 135, "neutral": 0, "servo_zero": 135, "direction": -1}
+    },
+    "left_shoulder_y": {
+      "channel": 5, "minimum": 135, "maximum": 180, "neutral": 180, "verified": false,
+      "joint": {"minimum": 0, "maximum": 45, "neutral": 0, "servo_zero": 180, "direction": -1}
+    }
+  },
+  "poses": {
+    "greeting": {"head": 70, "right_shoulder_x": null, "right_shoulder_y": null},
+    "invitation": {"left_shoulder_x": null, "left_shoulder_y": null}
+  }
+}

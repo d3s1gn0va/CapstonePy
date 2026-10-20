@@ -11,6 +11,8 @@
 
 Raspberry Pi 배포, 프로그램 재시작, 자동 실행 활성화, Arduino 업로드는 각각 별도 작업으로 취급한다.
 
+2026-10-05 최신 사용자 지시: "업로드 승인. 앞으로 그냥 바로 너가 업로드 해". 요청한 이 프로젝트의 코드 변경에 필요한 Arduino 업로드는 매번 재승인을 묻지 않고 진행할 수 있다. 검사/컴파일, 프로그램 중지/포트 소유 확인, 업로드 검증과 PING 확인, 결과 보고를 유지한다. 요청하지 않은 실물 동작/전시 재시작/자동 실행 전환과 PWM 펄스 폭 변경까지 위임된 것은 아니다. `AGENTS.md`와 최신 현재 상태를 우선한다.
+
 ## 1. Python 설정만 바꾼 경우
 
 1. `raspberry_pi/robot_demo/config.py` 또는 Python 파일을 수정한다.
@@ -28,13 +30,13 @@ Raspberry Pi 배포, 프로그램 재시작, 자동 실행 활성화, Arduino �
 2. `SERVO_MIN_PULSE_US`, `SERVO_MAX_PULSE_US`, 안전 각도 범위 변경 여부를 검토한다.
 3. 서보 안전 범위를 넓히는 경우 실제 기구물 충돌과 과부하 가능성을 먼저 경고한다.
 4. `scripts/build_arduino_remote.sh`로 Raspberry Pi에 Arduino 코드를 복사하고 `arduino-cli compile --fqbn arduino:avr:mega`까지만 실행한다.
-5. 컴파일이 성공해도 업로드는 자동으로 진행하지 않는다.
+5. 컴파일과 관련 검사가 성공하면 사용자 요청에 필요한 업로드를 최신 위임 범위에서 진행할 수 있다. 빌드 전용 스크립트 자체는 여전히 컴파일만 수행한다.
 
 `build_arduino_remote.sh`는 원격 빌드 경로 `/home/hyunwoo/capstone-robot-build/servo_controller`만 사용한다. Raspberry Pi 실행 코드 경로 `/home/hyunwoo/robot_demo`를 수정하지 않는다.
 
 ## 3. Arduino 업로드가 필요한 경우
 
-Arduino Mega 실제 업로드는 위험 작업이다. 사용자가 별도로 `Arduino 업로드 승인`이라고 명확히 말한 뒤에만 진행한다.
+Arduino Mega 실제 업로드는 보드 리셋/출력 변화 위험이 있다. 최신 사용자 위임 범위에서는 재승인을 묻지 않되 필요한 검사와 프로그램 중지/포트 확인을 생략하지 않는다. 업로드는 `--verify`로 검증하고 실패 시 추가 동작을 하지 않는다.
 
 업로드 스크립트:
 
@@ -42,7 +44,9 @@ Arduino Mega 실제 업로드는 위험 작업이다. 사용자가 별도로 `Ar
 scripts/flash_arduino_remote.sh
 ```
 
-스크립트 동작:
+아래 스크립트에는 기존 수동 승인 입력이 아직 남아 있다. 그 입력은 수동 실행 보호 장치이며 Codex가 사용자에게 재승인을 요구해야 한다는 최신 규칙은 아니다. Codex는 프로그램/포트/소스와 컴파일 결과를 직접 확인한 뒤 검증된 CLI 업로드 절차를 사용할 수 있다. 승인 입력을 우회하려고 확인/중지 절차까지 생략하지 않는다.
+
+기존 수동 스크립트 동작:
 
 1. 위험 경고를 출력한다.
 2. 실행자에게 정확한 승인 문구 `Arduino 업로드 승인` 입력을 요구한다.
