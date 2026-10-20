@@ -24,6 +24,11 @@ from ble_control import BLEControl, CommandError, SERVICE_UUID, COMMAND_UUID, ST
 from ble_credentials import CredentialStore
 from idle_eyes import IdleEyes
 from power_pose import PowerPose
+from exhibit_control import ExhibitControl
+from exhibit_sequences import ExhibitCatalog
+from exhibit_media import VolumeController, RecordManager
+from exhibit_worker import ExhibitWorker
+from exhibit_http import MediaHTTPServer
 
 PROPS = "org.freedesktop.DBus.Properties"
 OBJECTS = "org.freedesktop.DBus.ObjectManager"
@@ -57,6 +62,15 @@ class DanceWorker:
             self.buffer.extend(os.read(self.process.stdout.fileno(), 8192))
         except BlockingIOError:
             pass
+        exit_code = self.process.poll()
+        if exit_code is not None:
+            while True:
+                chunk = os.read(self.process.stdout.fileno(), 8192)
+                if not chunk:
+                    break
+                self.buffer.extend(chunk)
+                if len(self.buffer) > 8192:
+                    raise ValueError("Worker output too large")
         if len(self.buffer) > 8192:
             raise ValueError("Worker output too large")
         events = []
@@ -73,7 +87,7 @@ class DanceWorker:
             if event["state"] != "running":
                 self.terminal = event
             events.append(event)
-        return events, self.process.poll()
+        return events, exit_code
 
     def terminate(self):
         if self.process.poll() is None:
@@ -152,7 +166,8 @@ class StatusCharacteristic(GATTObject):
         if offset == 0:
             if device not in self.read_frames and len(self.read_frames) >= 8:
                 self.read_frames.pop(next(iter(self.read_frames)))
-            self.read_frames[device] = json.dumps(self.control.snapshot(), ensure_ascii=False,
+            snapshot = self.control.read_snapshot() if hasattr(self.control, "read_snapshot") else self.control.snapshot()
+            self.read_frames[device] = json.dumps(snapshot, ensure_ascii=False,
                                                   separators=(",", ":")).encode() + b"\n"
         # A long GATT read must retain one snapshot across all Read Blob offsets.
         raw = self.read_frames.get(device)
@@ -292,6 +307,14 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--confirm-5v-and-clear", action="store_true", help="Allow only the approved five-axis dance")
     parser.add_argument("--home-on-start-stop", action="store_true", help="Park six calibrated axes on startup and clean service shutdown")
+    parser.add_argument("--confirm-exhibit-scenes-and-clear", action="store_true",
+                        help="Separately authorize the new bounded exhibit/filming presets after checking clearance")
+    parser.add_argument("--allow-poweroff", action="store_true", help="Expose normal OS shutdown only when logind authorizes it")
+    parser.add_argument("--enable-recording", action="store_true", help="Opt in to real camera recording; disabled by default")
+    parser.add_argument("--records-root", type=Path, default=Path.home() / ".local/state/cuvo/records")
+    parser.add_argument("--media-bind", default="127.0.0.1")
+    parser.add_argument("--media-port", type=int, default=8765)
+    parser.add_argument("--media-base-url", help="Explicit same-LAN URL, e.g. http://cuvo.local:8765; enables signed record downloads")
     parser.add_argument("--pairing-seconds", type=int, default=120, choices=range(1, 901))
     args = parser.parse_args(argv)
     if args.home_on_start_stop and not args.confirm_5v_and_clear:
@@ -329,12 +352,38 @@ def main(argv=None):
             idle_eyes.before_dance()
             return DanceWorker()
 
-        control = BLEControl(code, start_dance, confirmed=args.confirm_5v_and_clear,
-                             credentials=credentials, hardware_ready=hardware_ready)
+        from motion_profile import load_profile
+        from oled_renderer import load_calibration
+        records = RecordManager(args.records_root, enabled=args.enable_recording)
+        media_server = None
+        if args.media_base_url:
+            media_server = MediaHTTPServer(records, credentials, bind_host=args.media_bind,
+                                          port=args.media_port, base_url=args.media_base_url)
+            media_server.start()
+
+        def start_exhibit(specification):
+            idle_eyes.before_dance()
+            return ExhibitWorker(specification)
+
+        allow_poweroff = False
+        if args.allow_poweroff:
+            try:
+                manager = dbus.Interface(bus.get_object("org.freedesktop.login1", "/org/freedesktop/login1"),
+                                         "org.freedesktop.login1.Manager")
+                allow_poweroff = str(manager.CanPowerOff()) == "yes"
+            except dbus.exceptions.DBusException:
+                pass
+            if not allow_poweroff:
+                print("[CUVO poweroff] unavailable: noninteractive logind permission required", file=sys.stderr)
+        control = ExhibitControl(code, start_dance, confirmed=args.confirm_5v_and_clear,
+                                 credentials=credentials, hardware_ready=hardware_ready,
+                                 catalog=ExhibitCatalog(load_profile(), load_calibration(), args.confirm_exhibit_scenes_and_clear),
+                                 exhibit_worker_factory=start_exhibit, volume=VolumeController(), records=records,
+                                 allow_poweroff=allow_poweroff, media=(lambda: media_server.descriptor) if media_server else None)
         application, advertisement = Application(bus, control), Advertisement(bus)
         agent = PairingAgent(bus, args.pairing_seconds)
         loop, registered, shutting_down = GLib.MainLoop(), [], False
-        normal_shutdown, parking_failed = False, False
+        normal_shutdown, parking_failed, requested_poweroff = False, False, False
 
         def publish(snapshot):
             application.status.enqueue(snapshot)
@@ -363,6 +412,13 @@ def main(argv=None):
             control.stop()
             control.publish()
 
+        def requested_shutdown():
+            nonlocal requested_poweroff
+            requested_poweroff = True
+            shutdown()
+
+        control.on_shutdown_ready = requested_shutdown
+
         for sig in (signal.SIGINT, signal.SIGTERM):
             GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, sig, lambda: (shutdown(), False)[1])
 
@@ -370,7 +426,9 @@ def main(argv=None):
             control.tick()
             eye_state = (idle_eyes.armed, idle_eyes.process)
             try:
-                idle_eyes.sync(control.state, busy=control.worker is not None, shutting_down=shutting_down)
+                # The filmed farewell ends with closed eyes, until another explicit scene.
+                eye_mode = "stopped" if control.scene_id == "09" and control.state == "completed" else control.state
+                idle_eyes.sync(eye_mode, busy=control.worker is not None, shutting_down=shutting_down)
             except (OSError, RuntimeError) as error:
                 # An OLED-only failure must not crash the BLE watchdog or start motion.
                 print(f"[CUVO eyes] {error}", file=sys.stderr, flush=True)
@@ -443,6 +501,20 @@ def main(argv=None):
                     pass
             (runtime / "connection-code").unlink(missing_ok=True)
             (runtime / "status.json").unlink(missing_ok=True)
+            control.close()
+            if media_server:
+                media_server.close()
+        if requested_poweroff and cleanup_safe and not parking_failed:
+            # No forced halt or shell; existing STOP/normal parking must finish first.
+            try:
+                result = subprocess.run(["systemctl", "--no-ask-password", "poweroff"],
+                                        stdin=subprocess.DEVNULL, timeout=5, check=False)
+                if result.returncode:
+                    print("[CUVO poweroff] OS rejected shutdown", file=sys.stderr)
+                    return 1
+            except (OSError, subprocess.TimeoutExpired):
+                print("[CUVO poweroff] OS shutdown not confirmed", file=sys.stderr)
+                return 1
         return 0 if "advert" in registered and not parking_failed else 1
 
 
