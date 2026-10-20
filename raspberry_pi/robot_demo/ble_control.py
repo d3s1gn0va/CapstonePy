@@ -18,6 +18,8 @@ class CommandError(ValueError):
 
 
 class BLEControl:
+    actions = {"session.claim", "session.resume", "session.status", "session.stop", "dance.start"}
+    command_fields = {"version", "request_id", "client_id", "action", "code", "token"}
     def __init__(self, code, worker_factory, confirmed=False, clock=time.monotonic,
                  credentials=None, hardware_ready=lambda: True):
         if len(code) != 6 or not code.isascii() or not code.isdigit():
@@ -30,6 +32,7 @@ class BLEControl:
         self.heartbeat = 0
         self.worker = None
         self.worker_started = 0
+        self.worker_timeout = 35
         self.stop_started = None
         self.state, self.phase, self.progress = "idle", "idle", 0.0
         self.message, self.action_id = None, None
@@ -61,11 +64,11 @@ class BLEControl:
             value = json.loads(raw.decode("utf-8"))
             if not isinstance(value, dict) or value.get("version") != 1 or type(value["version"]) is not int:
                 raise ValueError()
-            if set(value) - {"version", "request_id", "client_id", "action", "code", "token"}:
+            if set(value) - self.command_fields:
                 raise ValueError()
             request_id, client_id = (str(uuid.UUID(value[key])) for key in ("request_id", "client_id"))
             action = value["action"]
-            if action not in ("session.claim", "session.resume", "session.status", "session.stop", "dance.start"):
+            if action not in self.actions:
                 raise ValueError()
         except (ValueError, KeyError, TypeError, UnicodeError) as error:
             raise CommandError("Invalid CUVO v1 command") from error
@@ -117,6 +120,10 @@ class BLEControl:
             raise CommandError("Claim this controller before sending motion commands")
         self.heartbeat = self.clock()
         self.auth_id, self.auth_message = None, None
+        return self.owner_command(action, value, request_id)
+
+    def owner_command(self, action, value, request_id):
+        """Extension point after the existing encrypted-owner and replay checks."""
         if action == "session.stop":
             self.action_id = request_id
             self.stop()
@@ -157,20 +164,22 @@ class BLEControl:
             self.publish(message="연결 응답이 끊겨 놀이를 중단했어요.")
         if not self.worker:
             return
-        if now - self.worker_started >= 35 and self.stop_started is None:
+        if now - self.worker_started >= self.worker_timeout and self.stop_started is None:
             self.stop()
             self.publish(message="실행 시간 제한으로 중단하고 있어요.")
         try:
             events, exit_code = self.worker.poll()
             for event in events:
+                self.worker_event(event)
                 if event["state"] == "running" and self.stop_started is None:
                     self.state, self.phase, self.progress = "running", event["phase"], event["progress"]
                     self.publish()
             if exit_code is not None:
                 terminal = self.worker.terminal
                 if exit_code == 0 and terminal and terminal["state"] in ("completed", "stopped"):
-                    self.state = terminal["state"]
-                    self.progress, self.phase = terminal["progress"], terminal["phase"]
+                    cancelled = self.stop_started is not None
+                    self.state = "stopped" if cancelled else terminal["state"]
+                    self.progress, self.phase = (0, "idle") if cancelled else (terminal["progress"], terminal["phase"])
                     self.message = None
                 else:
                     self.state, self.message = "error", "정지 또는 동작 완료를 확인하지 못했어요. 현장 확인이 필요해요."
@@ -185,3 +194,7 @@ class BLEControl:
             self.stop()
             self.message = "실행 응답 오류. 실제 정지 여부를 확인해 주세요."
             self.publish()
+
+    def worker_event(self, event):
+        """Optional metadata from a strictly validated worker transport."""
+        pass

@@ -62,6 +62,17 @@ class IntegratedSequence:
         self.error = None
         return True
 
+    def start_steps(self, action, steps):
+        """Run an internally compiled preset; never accepts arbitrary BLE targets."""
+        if self.state not in {"idle", "completed"}:
+            return False
+        if not steps or not all(isinstance(step, Step) for step in steps):
+            raise ValueError("A nonempty compiled step plan is required")
+        self.steps = list(steps)
+        self.action, self.state, self.index, self.started = action, "running", 0, None
+        self.error = None
+        return True
+
     def _abort(self, error=None):
         stop_error = None
         try:
@@ -116,6 +127,8 @@ class IntegratedSequence:
                 pose = interpolate_gaze(step.eye_from, step.eye_to, elapsed, step.duration_ms / 1000)
             elif step.eyes == "open":
                 pose = EyePose()
+            elif step.eyes == "closed":
+                pose = EyePose(openness=0)
             else:
                 pose = EyePose(openness=blink_openness(self.eye_config, now))
             self.backend.show_eye(pose)
